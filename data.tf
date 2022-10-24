@@ -10,3 +10,7 @@ data "aws_ami" "amazon_linux" {
     ]
   }
 }
+
+data "aws_eks_cluster_auth" "example" {
+  name = var.cluster_name
+}

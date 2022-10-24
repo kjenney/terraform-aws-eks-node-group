@@ -1,9 +1,10 @@
 provider "aws" {
-  region = local.region
+  region = var.aws_region
 
   default_tags {
     tags = {
       Project = "terraform-aws-eks-spot-attribute-workers"
+      Owner   = "kjenney"
     }
   }
 
@@ -13,19 +14,4 @@ provider "aws" {
   skip_region_validation      = true
   skip_credentials_validation = true
   skip_requesting_account_id  = true
-}
-
-locals {
-  name   = "ex-asg-complete"
-  region = "us-east-1"
-  tags = {
-    Owner       = "user"
-    Environment = "dev"
-  }
-
-  user_data = <<-EOT
-  #!/bin/bash
-  set -o xtrace
-  /etc/eks/bootstrap.sh example
-  EOT
 }

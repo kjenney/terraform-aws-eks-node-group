@@ -1,6 +1,4 @@
 resource "aws_iam_role" "example" {
-  name = "eks-cluster-example"
-
   assume_role_policy = <<POLICY
 {
   "Version": "2012-10-17",
@@ -30,13 +28,13 @@ resource "aws_iam_role_policy_attachment" "example-AmazonEKSVPCResourceControlle
 }
 
 resource "aws_eks_cluster" "example" {
-  name     = "example"
+  name     = var.cluster_name
   role_arn = aws_iam_role.example.arn
 
   vpc_config {
     subnet_ids = module.vpc.private_subnets
     endpoint_private_access = true
-    endpoint_public_access = false
+    endpoint_public_access = true
     security_group_ids = [module.eks_sg.security_group_id]
   }
 
@@ -60,7 +58,7 @@ module "eks_sg" {
   source  = "terraform-aws-modules/security-group/aws"
   version = "~> 4.0"
 
-  name        = "eks_sg"
+  name        = "${var.cluster_name}_eks_sg"
   description = "Allow traffic from node group to EKS"
   vpc_id      = module.vpc.vpc_id
 
@@ -75,3 +73,16 @@ module "eks_sg" {
   egress_rules = ["all-all"]
 }
 
+resource "null_resource" "wait_for_cluster" {
+  provisioner "local-exec" {
+    command     = var.wait_for_cluster_cmd
+    interpreter = var.wait_for_cluster_interpreter
+    environment = {
+      ENDPOINT = aws_eks_cluster.example.endpoint
+    }
+  }
+
+  depends_on = [
+    aws_eks_cluster.example
+  ]
+}
