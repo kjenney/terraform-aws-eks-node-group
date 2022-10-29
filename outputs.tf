@@ -152,3 +152,12 @@ output "iam_instance_profile_unique" {
   description = "Stable and unique string identifying the IAM instance profile"
   value       = try(module.node_group.aws_iam_instance_profile.this[0].unique_id, "")
 }
+
+################################################################################
+# EKS Node Group Specific
+################################################################################
+
+output "instance_security_group_id" {
+  description = "The security group associated with instances in the node group"
+  value       = aws_security_group.node_group_sg.id
+}

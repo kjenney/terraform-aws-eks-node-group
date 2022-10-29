@@ -97,3 +97,7 @@ wait_for_cluster_interpreter
 ## Outputs
 
 We are using the `terraform-aws-autoscaling` module for the node group ASG where mixed instance policies are required. For a list of Outputs go to https://github.com/terraform-aws-modules/terraform-aws-autoscaling#outputs.
+
+Module-specific outputs are:
+
+instance_security_group_id

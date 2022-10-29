@@ -21,6 +21,7 @@ resource "aws_iam_role" "worker_role" {
   ]
 }
 EOF
+  tags = var.tags
 }
 
 resource "aws_iam_role_policy_attachment" "AmazonEKSWorkerNodePolicy" {
@@ -41,6 +42,7 @@ resource "aws_iam_role_policy_attachment" "AmazonEC2ContainerRegistryReadOnly" {
 resource "aws_iam_instance_profile" "worker_profile" {
   name = "worker_profile"
   role = aws_iam_role.worker_role.name
+  tags = var.tags
 }
 
 resource "aws_iam_role_policy" "session_manager_policy" {
@@ -136,9 +138,6 @@ resource "aws_security_group" "node_group_sg" {
     cidr_blocks      = ["0.0.0.0/0"]
     ipv6_cidr_blocks = ["::/0"]
   }
-}
 
-output "security_group_id" {
-  description = "The security group associated with instances in the node group"
-  value       = aws_security_group.node_group_sg.id
+  tags = var.tags
 }
