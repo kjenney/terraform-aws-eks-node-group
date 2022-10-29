@@ -8,9 +8,6 @@ This module allows the use of instance attributes and mixed instance policies wi
 <br>However, currently this requires a separate launch template and the use of aws_autoscaling_group rather than a eks_node_group resource.
 <br>Watch https://github.com/aws/containers-roadmap/issues/1297 and update this module accordingly.
 
-## Spot
-This module uses instance attributes to provide a wider swath of instances to choose from so that a cluster will remain stable for longer periods of time.
-
 ## Requirements
 
 * VPC
@@ -22,36 +19,63 @@ This module uses instance attributes to provide a wider swath of instances to ch
 
 ```
 module "eks_node_group" {
-  source                      = "../"
-  instance_requirements       = {
-    memory_mib {
+  source                      = "../../"
+  instance_requirements = {
+    memory_gib_per_vcpu = {
+      min = 2
+      max = 4
+    }
+
+    memory_mib = {
       min = 2048
       max = 32768
     }
 
-    vcpu_count {
-      min = 2
-      max = 4
+    network_interface_count = {
+      min = 1
+      max = 16
     }
 
-    memory_gib_per_vcpu {
+    vcpu_count = {
       min = 2
       max = 4
-    }
-
-    accelerator_count {
-      max = 0
     }
   }
-  subnet_ids                  = module.vpc.private_subnets
-  allowed_security_groups     = ["sg-123456789","sg-987654321"]
+
+  network_interfaces = [
+    {
+      delete_on_termination   = true
+      description             = "eth0"
+      device_index            = 0
+    },
+    {
+      delete_on_termination   = true
+      description             = "eth1"
+      device_index            = 1
+    }
+  ]
+  
+  mixed_instances_policy = {
+    instances_distribution = {
+      on_demand_base_capacity                   = 0
+      on_demand_percentage_above_base_capacity  = 10
+      spot_allocation_strategy                  = "capacity-optimized"
+      spot_instance_pools                       = 0
+    }
+  }
+
+  use_mixed_instances_policy  = true
+  capacity_rebalance          = true
+  vpc_zone_identifier         = module.vpc.private_subnets
+  vpc_id                      = module.vpc.vpc_id
+  allowed_security_groups     = [module.eks_sg.security_group_id]
   min_size                    = 1
   max_size                    = 2
-  cluster_name                = "example"
+  cluster_name                = local.cluster_name
   kubernetes_version          = "1.23"
-  eks_cluster_endpoint        = "https://987654321.gr7.us-east-1.eks.amazonaws.com"
-  eks_cluster_auth_token      = "k8s-aws-v1.aHR0cHM6Ly9zdHM....."
-  eks_cluster_ca_certificate  = "LS0tLS1CRUdJTiBDRVJUSUZJQ0....."
+  eks_cluster_endpoint        = aws_eks_cluster.example.endpoint
+  eks_cluster_auth_token      = data.aws_eks_cluster_auth.example.token
+  eks_cluster_ca_certificate  = base64decode(aws_eks_cluster.example.certificate_authority[0].data)
 }
 ```
 
@@ -61,24 +85,15 @@ We are using the `terraform-aws-autoscaling` module for the node group ASG where
 
 Module-specific inputs are:
 
-stack_name
+cluster_name
 eks_cluster_endpoint
 eks_cluster_auth_token
 eks_cluster_ca_certificate
 allowed_security_groups
-min_size
-max_size
-subnet_ids
 kubernetes_versions
-
-Optional
-
 wait_for_cluster_cmd
 wait_for_cluster_interpreter
-tags
 
 ## Outputs
 
 We are using the `terraform-aws-autoscaling` module for the node group ASG where mixed instance policies are required. For a list of Outputs go to https://github.com/terraform-aws-modules/terraform-aws-autoscaling#outputs.
-
-node_group_arn
