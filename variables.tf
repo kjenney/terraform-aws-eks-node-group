@@ -1,3 +1,9 @@
+variable "go_turbo" {
+  description = "Determines whether to use a custom autoscaling group or not"
+  type        = bool
+  default     = false
+}
+
 variable "cluster_name" {
   description = "Ths name of the EKS cluster"
 }
@@ -246,4 +252,10 @@ variable "warm_pool" {
   description = "If this block is configured, add a Warm Pool to the specified Auto Scaling group"
   type        = any
   default     = {}
+}
+
+variable "subnet_ids" {
+  description = "Identifiers of EC2 Subnets to associate with the EKS Node Group. These subnets must have the following resource tag: `kubernetes.io/cluster/CLUSTER_NAME` (where `CLUSTER_NAME` is replaced with the name of the EKS Cluster)."
+  type        = list(string)
+  default     = []
 }

@@ -22,7 +22,7 @@ resource "kubernetes_config_map" "iam_nodes_config_map" {
 
   data  = {
     mapRoles = <<ROLES
-- rolearn: ${aws_iam_role.worker_role.arn}
+- rolearn: ${aws_iam_role.eks_node_role.arn}
   username: system:node:{{EC2PrivateDNSName}}
   groups:
     - system:bootstrappers

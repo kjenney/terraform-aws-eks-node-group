@@ -69,6 +69,7 @@ module "eks_node_group" {
     }
   }
 
+  go_turbo                    = true
   use_mixed_instances_policy  = true
   capacity_rebalance          = true
   vpc_zone_identifier         = module.vpc.private_subnets

@@ -5,7 +5,7 @@ locals {
   )
 }
 
-resource "aws_iam_role" "worker_role" {
+resource "aws_iam_role" "eks_node_role" {
   assume_role_policy = <<EOF
 {
   "Version": "2012-10-17",
@@ -25,29 +25,29 @@ EOF
 }
 
 resource "aws_iam_role_policy_attachment" "AmazonEKSWorkerNodePolicy" {
-  role       = aws_iam_role.worker_role.name
+  role       = aws_iam_role.eks_node_role.name
   policy_arn = "arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy"
 }
 
 resource "aws_iam_role_policy_attachment" "AmazonEKS_CNI_Policy" {
   policy_arn = "arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy"
-  role       = aws_iam_role.worker_role.name
+  role       = aws_iam_role.eks_node_role.name
 }
 
 resource "aws_iam_role_policy_attachment" "AmazonEC2ContainerRegistryReadOnly" {
-  role       = aws_iam_role.worker_role.name
+  role       = aws_iam_role.eks_node_role.name
   policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
 }
 
-resource "aws_iam_instance_profile" "worker_profile" {
-  name = "worker_profile"
-  role = aws_iam_role.worker_role.name
+resource "aws_iam_instance_profile" "eks_node_profile" {
+  name = "eks_node_profile"
+  role = aws_iam_role.eks_node_role.name
   tags = var.tags
 }
 
 resource "aws_iam_role_policy" "session_manager_policy" {
   name = "session_manager_policy"
-  role = aws_iam_role.worker_role.id
+  role = aws_iam_role.eks_node_role.id
 
   policy = <<EOF
 {
@@ -67,8 +67,11 @@ resource "aws_iam_role_policy" "session_manager_policy" {
 EOF
 }
 
-module "node_group" {
+# using a static path here to account for environments where pulling in external
+# modules is not an option
+module "eks_node_group" {
   source                              = "../terraform-aws-autoscaling"
+  count                               = var.go_turbo ? 1 : 0
 
   name                                = "instance-req-${var.cluster_name}"
   
@@ -80,7 +83,7 @@ module "node_group" {
   update_default_version              = true
   create_launch_template              = true
   image_id                            = data.aws_ami.amazon_linux.id
-  iam_instance_profile_name           = aws_iam_instance_profile.worker_profile.name
+  iam_instance_profile_name           = aws_iam_instance_profile.eks_node_profile.name
   health_check_type                   = "EC2"
   security_groups                     = [aws_security_group.node_group_sg.id]
   user_data                           = base64encode(templatefile("${path.module}/user_data.sh.tpl", { cluster_name = var.cluster_name }))
@@ -116,6 +119,43 @@ module "node_group" {
   warm_pool                           = var.warm_pool
 
   tags                                = local.tags
+
+  depends_on = [
+    aws_iam_role_policy_attachment.AmazonEKSWorkerNodePolicy,
+    aws_iam_role_policy_attachment.AmazonEKS_CNI_Policy,
+    aws_iam_role_policy_attachment.AmazonEC2ContainerRegistryReadOnly,
+  ]
+}
+
+resource "aws_eks_node_group" "this" {
+  count           = var.go_turbo ? 0 : 1
+  cluster_name    = var.cluster_name
+  node_group_name = "instance-req-${var.cluster_name}"
+  node_role_arn   = aws_iam_role.eks_node_role.arn
+  subnet_ids      = var.subnet_ids
+
+  scaling_config {
+    desired_size = try(var.desired_capacity, var.min_size)
+    max_size     = var.max_size
+    min_size     = var.min_size
+  }
+
+  update_config {
+    max_unavailable = 1
+  }
+
+  # Ensure that IAM Role permissions are created before and deleted after EKS Node Group handling.
+  # Otherwise, EKS will not be able to properly delete EC2 Instances and Elastic Network Interfaces.
+  depends_on = [
+    aws_iam_role_policy_attachment.AmazonEKSWorkerNodePolicy,
+    aws_iam_role_policy_attachment.AmazonEKS_CNI_Policy,
+    aws_iam_role_policy_attachment.AmazonEC2ContainerRegistryReadOnly,
+  ]
+
+  # Optional: Allow external changes without Terraform plan difference
+  lifecycle {
+    ignore_changes = [scaling_config[0].desired_size]
+  }
 }
 
 resource "aws_security_group" "node_group_sg" {

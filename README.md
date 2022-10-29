@@ -19,7 +19,12 @@ This module allows the use of instance attributes and mixed instance policies wi
 
 ```
 module "eks_node_group" {
-  source                      = "../../"
+  source                = "../../"
+  
+  # Use a custom asg and launch template to use mixed instances policy
+  # and/or instance attributes
+  go_turbo              = true
+
   instance_requirements = {
     memory_gib_per_vcpu = {
       min = 2
@@ -85,14 +90,16 @@ We are using the `terraform-aws-autoscaling` module for the node group ASG where
 
 Module-specific inputs are:
 
-cluster_name
-eks_cluster_endpoint
-eks_cluster_auth_token
-eks_cluster_ca_certificate
-allowed_security_groups
-kubernetes_versions
-wait_for_cluster_cmd
-wait_for_cluster_interpreter
+* go_turbo
+* cluster_name
+* eks_cluster_endpoint
+* eks_cluster_auth_token
+* eks_cluster_ca_certificate
+* allowed_security_groups
+* kubernetes_versions
+* wait_for_cluster_cmd
+* wait_for_cluster_interpreter
+* subnet_ids: For use with eks_node_group. Identifiers of EC2 Subnets to associate with the EKS Node Group. These subnets must have the following resource tag: `kubernetes.io/cluster/CLUSTER_NAME` (where `CLUSTER_NAME` is replaced with the name of the EKS Cluster).
 
 ## Outputs
 
