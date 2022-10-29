@@ -6,11 +6,7 @@ data "aws_ami" "amazon_linux" {
     name = "name"
 
     values = [
-      "amazon-eks-node-1.23-*",
+      "amazon-eks-node-${var.kubernetes_version}-*",
     ]
   }
-}
-
-data "aws_eks_cluster_auth" "example" {
-  name = var.cluster_name
 }

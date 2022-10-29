@@ -1,3 +1,10 @@
+locals {
+  tags = merge(tomap({
+    "kubernetes.io/cluster/${var.cluster_name}" = "owned"}),
+    var.tags,
+  )
+}
+
 resource "aws_iam_role" "worker_role" {
   assume_role_policy = <<EOF
 {
@@ -33,12 +40,12 @@ resource "aws_iam_role_policy_attachment" "AmazonEC2ContainerRegistryReadOnly" {
 
 resource "aws_iam_instance_profile" "worker_profile" {
   name = "worker_profile"
-  role = "${aws_iam_role.worker_role.name}"
+  role = aws_iam_role.worker_role.name
 }
 
 resource "aws_iam_role_policy" "session_manager_policy" {
   name = "session_manager_policy"
-  role = "${aws_iam_role.worker_role.id}"
+  role = aws_iam_role.worker_role.id
 
   policy = <<EOF
 {
@@ -58,80 +65,80 @@ resource "aws_iam_role_policy" "session_manager_policy" {
 EOF
 }
 
-resource "aws_launch_template" "eks_worker" {
-  name_prefix = var.cluster_name
-  image_id    = data.aws_ami.amazon_linux.id
-  vpc_security_group_ids = [module.node_group_sg.security_group_id]
+module "node_group" {
+  source                              = "../terraform-aws-autoscaling"
 
-  iam_instance_profile {
-    name = aws_iam_instance_profile.worker_profile.name
-  }
+  name                                = "instance-req-${var.cluster_name}"
+  
+  vpc_zone_identifier                 = var.vpc_zone_identifier
+  min_size                            = var.min_size
+  max_size                            = var.max_size
+  desired_capacity                    = try(var.desired_capacity, var.min_size)
 
-  instance_requirements {
-    memory_mib {
-      min = 2048
-      max = 32768
-    }
+  update_default_version              = true
+  create_launch_template              = true
+  image_id                            = data.aws_ami.amazon_linux.id
+  iam_instance_profile_name           = aws_iam_instance_profile.worker_profile.name
+  health_check_type                   = "EC2"
+  security_groups                     = [aws_security_group.node_group_sg.id]
+  user_data                           = base64encode(templatefile("${path.module}/user_data.sh.tpl", { cluster_name = var.cluster_name }))
 
-    vcpu_count {
-      min = 2
-      max = 4
-    }
+  use_mixed_instances_policy          = var.use_mixed_instances_policy
+  mixed_instances_policy              = var.mixed_instances_policy
+  instance_requirements               = var.instance_requirements
+  
+  network_interfaces                  = var.network_interfaces
+  autoscaling_group_tags              = var.autoscaling_group_tags
+  block_device_mappings               = var.block_device_mappings
+  capacity_rebalance                  = var.capacity_rebalance
+  capacity_reservation_specification  = var.capacity_reservation_specification
+  cpu_options                         = var.cpu_options
+  ebs_optimized                       = var.ebs_optimized
+  elastic_gpu_specifications          = var.elastic_gpu_specifications
+  elastic_inference_accelerator       = var.elastic_inference_accelerator
+  enable_monitoring                   = var.enable_monitoring
+  enabled_metrics                     = var.enabled_metrics
+  enclave_options                     = var.enclave_options
+  health_check_grace_period           = var.health_check_grace_period
+  hibernation_options                 = var.hibernation_options
+  instance_market_options             = var.instance_market_options
+  instance_refresh                    = var.instance_refresh
+  instance_type                       = var.instance_type
+  max_instance_lifetime               = var.max_instance_lifetime
+  placement                           = var.placement
+  placement_group                     = var.placement_group
+  private_dns_name_options            = var.private_dns_name_options
+  protect_from_scale_in               = var.protect_from_scale_in
+  termination_policies                = var.termination_policies
+  wait_for_capacity_timeout           = var.wait_for_capacity_timeout
+  warm_pool                           = var.warm_pool
 
-    memory_gib_per_vcpu {
-      min = 2
-      max = 4
-    }
-
-    accelerator_count {
-      max = 0
-    }
-  }
-
-  user_data = base64encode(templatefile("${path.module}/user_data.sh.tpl", { cluster_name = var.cluster_name }))
+  tags                                = local.tags
 }
 
-resource "aws_autoscaling_group" "spot" {
-  vpc_zone_identifier = module.vpc.private_subnets
-  desired_capacity   = 2
-  max_size           = 2
-  min_size           = 1
-  capacity_rebalance = true
-
-  mixed_instances_policy {
-    instances_distribution {
-      on_demand_base_capacity = 0
-      spot_allocation_strategy = "capacity-optimized"
-    }
-
-    launch_template {
-      launch_template_specification {
-        launch_template_id = aws_launch_template.eks_worker.id
-      }
-    }
-  }
-
-  tag {
-    key                 = "kubernetes.io/cluster/${var.cluster_name}"
-    value               = "owned"
-    propagate_at_launch = true
-  }
-
-  depends_on = [
-    aws_eks_cluster.example
-  ]
-}
-
-module "node_group_sg" {
-  source  = "terraform-aws-modules/security-group/aws"
-  version = "~> 4.0"
-
-  name        = "${var.cluster_name}_node_group_sg"
-  vpc_id      = module.vpc.vpc_id
-
+resource "aws_security_group" "node_group_sg" {
+  name        = "node_group_sg"
+  vpc_id      = var.vpc_id
   description = "Security group for node_group_sg"
 
-  ingress_cidr_blocks = ["0.0.0.0/0"]
+  ingress {
+    description      = "All from anotehr SG"
+    from_port        = 0
+    to_port          = 0
+    protocol         = "-1"
+    security_groups = var.allowed_security_groups
+  }
 
-  egress_rules = ["all-all"]
+  egress {
+    from_port        = 0
+    to_port          = 0
+    protocol         = "-1"
+    cidr_blocks      = ["0.0.0.0/0"]
+    ipv6_cidr_blocks = ["::/0"]
+  }
+}
+
+output "security_group_id" {
+  description = "The security group associated with instances in the node group"
+  value       = aws_security_group.node_group_sg.id
 }

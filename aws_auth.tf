@@ -1,7 +1,17 @@
+resource "null_resource" "wait_for_cluster" {
+  provisioner "local-exec" {
+    command     = var.wait_for_cluster_cmd
+    interpreter = var.wait_for_cluster_interpreter
+    environment = {
+      ENDPOINT = var.eks_cluster_endpoint
+    }
+  }
+}
+
 provider "kubernetes" {
-  host                   = aws_eks_cluster.example.endpoint
-  token                  = data.aws_eks_cluster_auth.example.token
-  cluster_ca_certificate = base64decode(aws_eks_cluster.example.certificate_authority.0.data)
+  host                   = var.eks_cluster_endpoint
+  token                  = var.eks_cluster_auth_token
+  cluster_ca_certificate = var.eks_cluster_ca_certificate
 }
 
 resource "kubernetes_config_map" "iam_nodes_config_map" {
