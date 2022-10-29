@@ -80,7 +80,7 @@ module "node_group" {
   image_id                            = data.aws_ami.amazon_linux.id
   iam_instance_profile_name           = aws_iam_instance_profile.worker_profile.name
   health_check_type                   = "EC2"
-  security_groups                     = [module.node_group_sg.security_group_id]
+  security_groups                     = [aws_security_group.node_group_sg.id]
   user_data                           = base64encode(templatefile("${path.module}/user_data.sh.tpl", { cluster_name = var.cluster_name }))
 
   use_mixed_instances_policy          = var.use_mixed_instances_policy
@@ -116,21 +116,29 @@ module "node_group" {
   tags                                = local.tags
 }
 
-module "node_group_sg" {
-  source  = "terraform-aws-modules/security-group/aws"
-  version = "~> 4.0"
-
-  name        = "${var.cluster_name}_node_group_sg"
+resource "aws_security_group" "node_group_sg" {
+  name        = "node_group_sg"
   vpc_id      = var.vpc_id
-
   description = "Security group for node_group_sg"
 
-  ingress_cidr_blocks = ["0.0.0.0/0"]
+  ingress {
+    description      = "All from anotehr SG"
+    from_port        = 0
+    to_port          = 0
+    protocol         = "-1"
+    security_groups = var.allowed_security_groups
+  }
 
-  egress_rules = ["all-all"]
+  egress {
+    from_port        = 0
+    to_port          = 0
+    protocol         = "-1"
+    cidr_blocks      = ["0.0.0.0/0"]
+    ipv6_cidr_blocks = ["::/0"]
+  }
 }
 
 output "security_group_id" {
   description = "The security group associated with instances in the node group"
-  value       = module.node_group_sg.security_group_id
+  value       = aws_security_group.node_group_sg.id
 }

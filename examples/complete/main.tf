@@ -59,6 +59,7 @@ module "eks_node_group" {
       device_index            = 1
     }
   ]
+  
   mixed_instances_policy = {
     instances_distribution = {
       on_demand_base_capacity                   = 0
@@ -72,7 +73,7 @@ module "eks_node_group" {
   capacity_rebalance          = true
   vpc_zone_identifier         = module.vpc.private_subnets
   vpc_id                      = module.vpc.vpc_id
-  allowed_security_groups     = ["sg-123456789","sg-987654321"]
+  allowed_security_groups     = [module.eks_sg.security_group_id]
   min_size                    = 1
   max_size                    = 2
   cluster_name                = local.cluster_name
