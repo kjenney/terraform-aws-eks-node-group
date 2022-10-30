@@ -48,17 +48,17 @@ output "iam_role_unique_id" {
 
 output "iam_instance_profile_arn" {
   description = "ARN assigned by AWS to the instance profile"
-  value       = try(aws_iam_instance_profile.eks_node_profile.arn, "")
+  value       = try(aws_iam_instance_profile.eks_node_profile[0].arn, "")
 }
 
 output "iam_instance_profile_id" {
   description = "Instance profile's ID"
-  value       = try(aws_iam_instance_profile.eks_node_profile.id, "")
+  value       = try(aws_iam_instance_profile.eks_node_profile[0].id, "")
 }
 
 output "iam_instance_profile_unique" {
   description = "Stable and unique string identifying the IAM instance profile"
-  value       = try(aws_iam_instance_profile.eks_node_profile.unique_id, "")
+  value       = try(aws_iam_instance_profile.eks_node_profile[0].unique_id, "")
 }
 
 ################################################################################
@@ -67,5 +67,5 @@ output "iam_instance_profile_unique" {
 
 output "instance_security_group_id" {
   description = "The security group associated with instances in the node group"
-  value       = aws_security_group.node_group_sg.id
+  value       = try(aws_security_group.node_group_sg[0].id, "")
 }

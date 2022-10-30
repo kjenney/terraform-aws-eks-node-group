@@ -27,32 +27,14 @@ resource "aws_iam_role_policy_attachment" "example-AmazonEKSVPCResourceControlle
   role       = aws_iam_role.example.name
 }
 
-resource "aws_eks_cluster" "example" {
-  name     = local.cluster_name
-  role_arn = aws_iam_role.example.arn
-
-  vpc_config {
-    subnet_ids = module.vpc.private_subnets
-    endpoint_private_access = true
-    endpoint_public_access = true
-    security_group_ids = [module.eks_sg.security_group_id]
-  }
-
-  # Ensure that IAM Role permissions are created before and deleted after EKS Cluster handling.
-  # Otherwise, EKS will not be able to properly delete EKS managed EC2 infrastructure such as Security Groups.
-  depends_on = [
-    aws_iam_role_policy_attachment.example-AmazonEKSClusterPolicy,
-    aws_iam_role_policy_attachment.example-AmazonEKSVPCResourceController,
-  ]
-}
-
 data "aws_eks_cluster_auth" "example" {
   name = local.cluster_name
 }
 
-module "eks_sg" {
-  source  = "terraform-aws-modules/security-group/aws"
-  version = "~> 4.0"
+module "eks_sg_basic" {
+  source      = "terraform-aws-modules/security-group/aws"
+  create      = false
+  version     = "~> 4.0"
 
   name        = "${local.cluster_name}_eks_sg"
   description = "Allow traffic from node group to EKS"
@@ -61,10 +43,29 @@ module "eks_sg" {
   computed_ingress_with_source_security_group_id = [
     {
       rule                     = "all-all"
-      source_security_group_id = module.eks_node_group.instance_security_group_id
+      source_security_group_id = module.basic.instance_security_group_id
     }
   ]
   number_of_computed_ingress_with_source_security_group_id = 1
 
   egress_rules = ["all-all"]
+}
+
+resource "aws_eks_cluster" "example" {
+  name     = local.cluster_name
+  role_arn = aws_iam_role.example.arn
+
+  vpc_config {
+    subnet_ids = module.vpc.private_subnets
+    endpoint_private_access = true
+    endpoint_public_access = true
+    security_group_ids = [module.eks_sg_basic.security_group_id]
+  }
+
+  # Ensure that IAM Role permissions are created before and deleted after EKS Cluster handling.
+  # Otherwise, EKS will not be able to properly delete EKS managed EC2 infrastructure such as Security Groups.
+  depends_on = [
+    aws_iam_role_policy_attachment.example-AmazonEKSClusterPolicy,
+    aws_iam_role_policy_attachment.example-AmazonEKSVPCResourceController,
+  ]
 }

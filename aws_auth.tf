@@ -1,4 +1,5 @@
 resource "null_resource" "wait_for_cluster" {
+  count = local.create ? 1 : 0
   provisioner "local-exec" {
     command     = var.wait_for_cluster_cmd
     interpreter = var.wait_for_cluster_interpreter
@@ -15,6 +16,7 @@ provider "kubernetes" {
 }
 
 resource "kubernetes_config_map" "iam_nodes_config_map" {
+  count       = var.go_turbo && local.create ? 1 : 0
   metadata {
     name      = "aws-auth"
     namespace = "kube-system"

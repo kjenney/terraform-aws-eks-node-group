@@ -1,4 +1,5 @@
 locals {
+  create = var.create
   tags = merge(tomap({
     "kubernetes.io/cluster/${var.cluster_name}" = "owned"}),
     var.tags,
@@ -40,13 +41,13 @@ resource "aws_iam_role_policy_attachment" "AmazonEC2ContainerRegistryReadOnly" {
 }
 
 resource "aws_iam_instance_profile" "eks_node_profile" {
+  count       = var.go_turbo && local.create ? 1 : 0
   name = "eks_node_profile"
   role = aws_iam_role.eks_node_role.name
   tags = var.tags
 }
 
 resource "aws_iam_role_policy" "session_manager_policy" {
-  name = "session_manager_policy"
   role = aws_iam_role.eks_node_role.id
 
   policy = <<EOF
@@ -71,7 +72,7 @@ EOF
 # modules is not an option
 module "eks_node_group" {
   source                              = "../terraform-aws-autoscaling"
-  count                               = var.go_turbo ? 1 : 0
+  count                               = var.go_turbo && local.create ? 1 : 0
 
   name                                = "instance-req-${var.cluster_name}"
   
@@ -83,9 +84,9 @@ module "eks_node_group" {
   update_default_version              = true
   create_launch_template              = true
   image_id                            = data.aws_ami.amazon_linux.id
-  iam_instance_profile_name           = aws_iam_instance_profile.eks_node_profile.name
+  iam_instance_profile_name           = aws_iam_instance_profile.eks_node_profile[0].name
   health_check_type                   = "EC2"
-  security_groups                     = [aws_security_group.node_group_sg.id]
+  security_groups                     = [aws_security_group.node_group_sg[0].id]
   user_data                           = base64encode(templatefile("${path.module}/user_data.sh.tpl", { cluster_name = var.cluster_name }))
 
   use_mixed_instances_policy          = var.use_mixed_instances_policy
@@ -128,14 +129,14 @@ module "eks_node_group" {
 }
 
 resource "aws_eks_node_group" "this" {
-  count           = var.go_turbo ? 0 : 1
+  count           = local.create && !var.go_turbo ? 1 : 0
   cluster_name    = var.cluster_name
   node_group_name = "instance-req-${var.cluster_name}"
   node_role_arn   = aws_iam_role.eks_node_role.arn
   subnet_ids      = var.subnet_ids
 
   scaling_config {
-    desired_size = try(var.desired_capacity, var.min_size)
+    desired_size = var.desired_capacity
     max_size     = var.max_size
     min_size     = var.min_size
   }
@@ -159,6 +160,7 @@ resource "aws_eks_node_group" "this" {
 }
 
 resource "aws_security_group" "node_group_sg" {
+  count       = var.go_turbo && local.create ? 1 : 0
   name        = "node_group_sg"
   vpc_id      = var.vpc_id
   description = "Security group for node_group_sg"

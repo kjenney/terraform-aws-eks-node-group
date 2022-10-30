@@ -23,8 +23,13 @@ resource "random_string" "suffix" {
   special = false
 }
 
-module "eks_node_group" {
-  source                      = "../../"
+################################################################################
+# Mixed instances policy with instance attributes
+################################################################################
+
+module "mixed_instances_and_instance_attributes" {
+  source                = "../../"
+  create                = false
   instance_requirements = {
     memory_gib_per_vcpu = {
       min = 2
@@ -74,7 +79,7 @@ module "eks_node_group" {
   capacity_rebalance          = true
   vpc_zone_identifier         = module.vpc.private_subnets
   vpc_id                      = module.vpc.vpc_id
-  allowed_security_groups     = [module.eks_sg.security_group_id]
+  allowed_security_groups     = [module.eks_sg_mixed.security_group_id]
   min_size                    = 1
   max_size                    = 2
   cluster_name                = local.cluster_name
